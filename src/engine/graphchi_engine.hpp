@@ -40,6 +40,7 @@
 #include <omp.h>
 #include <vector>
 #include <sys/time.h>
+#include <numeric>
 
 #include "api/chifilenames.hpp"
 #include "api/graph_objects.hpp"
@@ -396,16 +397,17 @@ namespace graphchi {
         virtual void exec_updates(GraphChiProgram<VertexDataType, EdgeDataType, svertex_t> &userprogram,
                           std::vector<svertex_t> &vertices) {
             metrics_entry me = m.start_time();
-            size_t nvertices = vertices.size();
             if (!enable_deterministic_parallelism) {
-                for(int i=0; i < (int)nvertices; i++) vertices[i].parallel_safe = true;
+                for(auto& v: vertices) { 
+                    v.parallel_safe = true;
+                }
             }
-            int sub_interval_len = sub_interval_en - sub_interval_st;
+            vid_t sub_interval_len = sub_interval_en - sub_interval_st;
 
             std::vector<vid_t> random_order(randomization ? sub_interval_len + 1 : 0);
             if (randomization) {
                 // Randomize vertex-vector
-                for(int idx=0; idx <= (int)sub_interval_len; idx++) random_order[idx] = idx;
+                std::iota(random_order.begin(), random_order.end(), 0);
                 std::random_shuffle(random_order.begin(), random_order.end());
             }
              
@@ -417,7 +419,7 @@ namespace graphchi {
         #pragma omp section
                         {
         #pragma omp parallel for
-                        for(int idx=0; idx <= (int)sub_interval_len; idx++) {
+                        for(vid_t idx=0; idx <= sub_interval_len; idx++) {
                                 vid_t vid = sub_interval_st + (randomization ? random_order[idx] : idx);
                                 svertex_t & v = vertices[vid - sub_interval_st];
                                 
@@ -433,7 +435,7 @@ namespace graphchi {
                         {
                             if (exec_threads > 1 && enable_deterministic_parallelism) {
                                 int nonsafe_count = 0;
-                                for(int idx=0; idx <= (int)sub_interval_len; idx++) {
+                                for(vid_t idx=0; idx <= sub_interval_len; idx++) {
                                     vid_t vid = sub_interval_st + (randomization ? random_order[idx] : idx);
                                     svertex_t & v = vertices[vid - sub_interval_st];
                                     if (!v.parallel_safe && v.scheduled) {
@@ -471,7 +473,7 @@ namespace graphchi {
                 chicontext.iteration = iter;
                 if (iter > 0) // First one run before -- ugly
                     userprogram.before_iteration(iter, chicontext);
-                userprogram.before_exec_interval(0, (int)num_vertices(), chicontext);
+                userprogram.before_exec_interval(0, num_vertices(), chicontext);
                 
                 if (use_selective_scheduling) {
                     if (iter > 0 && !scheduler->has_new_tasks) {
@@ -482,7 +484,7 @@ namespace graphchi {
                     scheduler->new_iteration(iter);
                     
                     bool newtasks = false;
-                    for(int i=0; i < (int)vertices.size(); i++) { // Could, should parallelize
+                    for(vid_t i=0; i < vertices.size(); i++) { // Could, should parallelize
                         if (iter == 0 || scheduler->is_scheduled(i)) {
                             vertices[i].scheduled =  true;
                             newtasks = true;
@@ -622,7 +624,7 @@ namespace graphchi {
             return get_interval(i).second;
         }
         
-        virtual size_t num_vertices() {
+        virtual vid_t num_vertices() {
             return 1 + intervals[nshards - 1].second;
         }
         
@@ -755,7 +757,9 @@ namespace graphchi {
             if (sliding_shards.size() == 0) {
                 initialize_sliding_shards();
                 if (initialize_edges_before_run) {
-                    for(int j=0; j<(int)sliding_shards.size(); j++) sliding_shards[j]->initdata();
+                    for (auto& s: sliding_shards) {
+                        s->initdata();
+                    }
                 }
             } else {
                 logstream(LOG_DEBUG) << "Engine being restarted, do not reinitialize." << std::endl;
@@ -975,8 +979,8 @@ namespace graphchi {
             m.set("niters", niters);
             
             // Close outputs
-            for(int i=0; i< (int)outputs.size(); i++) {
-                outputs[i]->close();
+            for(auto& o: outputs) {
+                o->close();
             }   
             outputs.clear();
             
@@ -1112,13 +1116,13 @@ namespace graphchi {
                 std::string dirname = dirname_shard_edata_block(edatashardname, blocksize);
                 size_t edatasize = get_shard_edata_filesize<ET>(edatashardname);
                 logstream(LOG_INFO) << "Clearing data: " << edatashardname << " bytes: " << edatasize << std::endl;
-                int nblocks = (int) ((edatasize / blocksize) + (edatasize % blocksize == 0 ? 0 : 1));
+                int nblocks = (size_t) ((edatasize / blocksize) + (edatasize % blocksize == 0 ? 0 : 1));
                 for(int i=0; i < nblocks; i++) {
                     std::string block_filename = filename_shard_edata_block(edatashardname, i, blocksize);
-                    int len = (int) std::min(edatasize - i * blocksize, blocksize);
+                    size_t len = (size_t) std::min(edatasize - i * blocksize, blocksize);
                     int f = open(block_filename.c_str(), O_RDWR | O_CREAT, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);
                     ET * buf =  (ET *) malloc(len);
-                    for(int i=0; i < (int) (len / sizeof(ET)); i++) {
+                    for(size_t i=0; i < (size_t) (len / sizeof(ET)); i++) {
                         buf[i] = zerovalue;
                     }
                     write_compressed(f, buf, len);
