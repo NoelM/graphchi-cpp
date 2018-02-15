@@ -103,25 +103,24 @@ namespace graphchi {
      */
     
     // This is hacky...
-    static inline bool VARIABLE_IS_NOT_USED is_deleted_edge_value(int val);
+    static inline bool VARIABLE_IS_NOT_USED is_deleted_edge_value(bool val);
     static inline bool VARIABLE_IS_NOT_USED is_deleted_edge_value(bool val) {
         return val;
     }
     
-    static inline bool VARIABLE_IS_NOT_USED is_deleted_edge_value(int val);
-    static inline bool VARIABLE_IS_NOT_USED is_deleted_edge_value(int val) {
-        return 0xffffffff == (unsigned int)val;
+    static inline bool VARIABLE_IS_NOT_USED is_deleted_edge_value(uint32_t val);
+    static inline bool VARIABLE_IS_NOT_USED is_deleted_edge_value(uint32_t val) {
+        return UINT32_MAX == val;
     }
     
-    static inline bool VARIABLE_IS_NOT_USED is_deleted_edge_value(vid_t val);
-    static inline bool VARIABLE_IS_NOT_USED is_deleted_edge_value(vid_t val) {
-        return 0xffffffffu == val;
+    static inline bool VARIABLE_IS_NOT_USED is_deleted_edge_value(uint64_t val);
+    static inline bool VARIABLE_IS_NOT_USED is_deleted_edge_value(uint64_t val) {
+        return UINT64_MAX == val;
     }
-    
     
     static inline bool VARIABLE_IS_NOT_USED is_deleted_edge_value(float val);
     static inline bool VARIABLE_IS_NOT_USED is_deleted_edge_value(float val) {
-        return !(val < 0 || val > 0);
+        return val == 0;
     }
     
     static void VARIABLE_IS_NOT_USED remove_edgev(graphchi_edge<bool> * e);
@@ -129,14 +128,14 @@ namespace graphchi {
         e->set_data(true);
     }
     
-    static void VARIABLE_IS_NOT_USED remove_edgev(graphchi_edge<vid_t> * e);
-    static void VARIABLE_IS_NOT_USED remove_edgev(graphchi_edge<vid_t> * e) {
-        e->set_data(0xffffffff);
+    static void VARIABLE_IS_NOT_USED remove_edgev(graphchi_edge<uint32_t> * e);
+    static void VARIABLE_IS_NOT_USED remove_edgev(graphchi_edge<uint32_t> * e) {
+        e->set_data(UINT32_MAX);
     }
-    
-    static void VARIABLE_IS_NOT_USED remove_edgev(graphchi_edge<int> * e);
-    static void VARIABLE_IS_NOT_USED remove_edgev(graphchi_edge<int> * e) {
-        e->set_data(0xffffffff);
+
+    static void VARIABLE_IS_NOT_USED remove_edgev(graphchi_edge<uint64_t> * e);
+    static void VARIABLE_IS_NOT_USED remove_edgev(graphchi_edge<uint64_t> * e) {
+        e->set_data(UINT64_MAX);
     }
     
 #endif  
@@ -146,8 +145,8 @@ namespace graphchi {
     class internal_graphchi_vertex {
         
     public:   // Todo, use friend
-        volatile int inc;
-        volatile int outc;
+        volatile vid_t inc;
+        volatile vid_t outc;
         
         vid_t vertexid;
 
@@ -160,14 +159,13 @@ namespace graphchi {
         bool modified;
         VertexDataType * dataptr;
 
-
         /* Accessed directly by the engine */
         bool scheduled;
         bool parallel_safe;
         
 #ifdef SUPPORT_DELETIONS
-        int deleted_inc;
-        int deleted_outc;
+        vid_t deleted_inc;
+        vid_t deleted_outc;
 #endif
         
         
@@ -178,12 +176,8 @@ namespace graphchi {
             dataptr = NULL;
         }
         
-        
-        internal_graphchi_vertex(vid_t _id, graphchi_edge<EdgeDataType> * iptr, 
-                                graphchi_edge<EdgeDataType> * optr, 
-                                 int indeg, 
-                                 int outdeg) : 
-                            vertexid(_id), inedges_ptr(iptr), outedges_ptr(optr) {
+        internal_graphchi_vertex(vid_t _id, graphchi_edge<EdgeDataType> * iptr, graphchi_edge<EdgeDataType> * optr, 
+                                 int indeg, int outdeg) : vertexid(_id), inedges_ptr(iptr), outedges_ptr(optr) {
             inc = 0;
             outc = 0;
             scheduled = false;
@@ -197,26 +191,23 @@ namespace graphchi {
         }
         
         virtual ~internal_graphchi_vertex() {}
-
         
         vid_t id() const {
             return vertexid;
         }
         
-        int num_inedges() const { 
+        vid_t num_inedges() const { 
             return inc; 
-            
         }
-        int num_outedges() const { 
+
+        vid_t num_outedges() const { 
             return outc; 
         }
-        int num_edges() const { 
+
+        vid_t num_edges() const { 
             return inc + outc; 
         }
 
-
-        
-                
         // Optimization: as only memshard (not streaming shard) creates inedgers,
         // we do not need atomic instructions here!
         inline void add_inedge(vid_t src, EdgeDataType * ptr, bool special_edge) {
@@ -226,15 +217,11 @@ namespace graphchi {
                 return;
             }
 #endif
-            int i = __sync_add_and_fetch(&inc, 1);
+            vid_t i = __sync_add_and_fetch(&inc, 1);
             if (inedges_ptr != NULL)
                 inedges_ptr[i - 1] = graphchi_edge<EdgeDataType>(src, ptr);
             
             assert(src != vertexid);
-          /*  if(inedges_ptr != NULL && inc > outedges_ptr - inedges_ptr) {
-                logstream(LOG_FATAL) << "Tried to add more in-edges as the stored in-degree of this vertex (" << src << "). Perhaps a preprocessing step had failed?" << std::endl;
-                assert(inc <= outedges_ptr - inedges_ptr);
-            } */  // Deleted, since does not work when we have separate in-edge and out-edge arrays
         }
         
         inline void add_outedge(vid_t dst, EdgeDataType * ptr, bool special_edge) {
@@ -244,26 +231,21 @@ namespace graphchi {
                 return;
             }
 #endif
-            int i = __sync_add_and_fetch(&outc, 1);
+            vid_t i = __sync_add_and_fetch(&outc, 1);
             if (outedges_ptr != NULL) outedges_ptr[i - 1] = graphchi_edge<EdgeDataType>(dst, ptr);
             assert(dst != vertexid);
         }
-        
-        
-    };
+    }; // internal_graphchi_vertex
     
+
     template <typename VertexDataType, typename EdgeDataType >
     class graphchi_vertex : public internal_graphchi_vertex<VertexDataType, EdgeDataType> {
         
     public:
-        
         graphchi_vertex() : internal_graphchi_vertex<VertexDataType, EdgeDataType>() { }
         
-        graphchi_vertex(vid_t _id, 
-                        graphchi_edge<EdgeDataType> * iptr, 
-                                 graphchi_edge<EdgeDataType> * optr, 
-                        int indeg, 
-                        int outdeg) : 
+        graphchi_vertex(vid_t _id, graphchi_edge<EdgeDataType> * iptr, graphchi_edge<EdgeDataType> * optr, 
+                        int indeg, int outdeg) : 
             internal_graphchi_vertex<VertexDataType, EdgeDataType>(_id, iptr, optr, indeg, outdeg) {}
         
         virtual ~graphchi_vertex() {}
@@ -272,25 +254,25 @@ namespace graphchi {
           * Returns ith edge of a vertex, ignoring 
           * edge direction.
           */
-        graphchi_edge<EdgeDataType> * edge(int i) {
+        graphchi_edge<EdgeDataType> * edge(vid_t i) {
             if (i < this->inc) return inedge(i);
             else return outedge(i - this->inc);
         }
 
         
-        graphchi_edge<EdgeDataType> * inedge(int i) {
-            assert(i >= 0 && i < this->inc);
+        graphchi_edge<EdgeDataType> * inedge(vid_t i) {
+            assert(i < this->inc);
             return &this->inedges_ptr[i];
         }
         
-        graphchi_edge<EdgeDataType> * outedge(int i) {
-            assert(i >= 0 && i < this->outc);
+        graphchi_edge<EdgeDataType> * outedge(vid_t i) {
+            assert(i < this->outc);
             return &this->outedges_ptr[i];
         }        
         
         graphchi_edge<EdgeDataType> * random_outedge() {
             if (this->outc == 0) return NULL;
-            return outedge((int) (std::abs(random()) % this->outc));
+            return outedge((vid_t)(std::abs(random()) % this->outc));
         }
             
         /** 
@@ -338,41 +320,39 @@ namespace graphchi {
                 memmove(&this->inedges_ptr[this->inc], this->outedges_ptr, this->outc * sizeof(graphchi_edge<EdgeDataType>));
                 this->outedges_ptr = &this->inedges_ptr[this->inc];
             }
-            quickSort(this->inedges_ptr, (int) (this->inc + this->outc), eptr_less<EdgeDataType>);
+            quickSort(this->inedges_ptr, this->inc + this->outc, eptr_less<EdgeDataType>);
             
         }
         
         
 #ifdef SUPPORT_DELETIONS
-        void VARIABLE_IS_NOT_USED remove_edge(int i) {
+        void VARIABLE_IS_NOT_USED remove_edge(vid_t i) {
             remove_edgev(edge(i));
         }
         
-        void VARIABLE_IS_NOT_USED remove_inedge(int i) {
+        void VARIABLE_IS_NOT_USED remove_inedge(vid_t i) {
             remove_edgev(inedge(i));
         }
         
-        void VARIABLE_IS_NOT_USED remove_outedge(int i) {
+        void VARIABLE_IS_NOT_USED remove_outedge(vid_t i) {
             remove_edgev(outedge(i));
         }
         
         void VARIABLE_IS_NOT_USED remove_alledges() {
-            for(int j=this->num_edges()-1; j>=0; j--) remove_edge(j);
+            for(vid_t j=this->num_edges()-1; j!=0; j--) remove_edge(j);
         }
         
         
         void VARIABLE_IS_NOT_USED remove_alloutedges() {
-            for(int j=this->num_outedges()-1; j>=0; j--) remove_outedge(j);
+            for(vid_t j=this->num_outedges()-1; j!=0; j--) remove_outedge(j);
         }
         
         void VARIABLE_IS_NOT_USED remove_allinedges() {
-            for(int j=this->num_inedges()-1; j>=0; j--) remove_inedge(j);
+            for(vid_t j=this->num_inedges()-1; j!=0; j--) remove_inedge(j);
         }
         
         
 #endif
-        
-        
     };
     
     /**
@@ -394,9 +374,6 @@ namespace graphchi {
     inline bool is_special(vid_t rawid) {
         return (rawid & HIGHMASK) != 0;
     }
-    
-    
-
 } // Namespace
 
 #endif
