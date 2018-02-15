@@ -66,6 +66,7 @@ namespace graphchi {
     /* Simple string to number parsers */
     static void VARIABLE_IS_NOT_USED parse(int &x, const char * s);
     static void VARIABLE_IS_NOT_USED parse(unsigned int &x, const char * s);
+    static void VARIABLE_IS_NOT_USED parse(unsigned long int &x, const char * s);
     static void VARIABLE_IS_NOT_USED parse(float &x, const char * s);
     static void VARIABLE_IS_NOT_USED parse(long &x, const char * s);
     static void VARIABLE_IS_NOT_USED parse(char &x, const char * s);
@@ -82,12 +83,15 @@ namespace graphchi {
         x = (unsigned int) strtoul(s, NULL, 10);
     }
     
+    static void parse(unsigned long int &x, const char * s) {
+        x = (unsigned long int) strtoull(s, NULL, 10);
+    }
+    
     static void parse(float &x, const char * s) {
         x = (float) atof(s);
     }
     
     static void parse(dummy &x, const char *s) {}
-    
     
     /**
      * Special templated parser for PairContainers.
@@ -153,10 +157,9 @@ namespace graphchi {
     }
     
     
-    
     // Removes \n from the end of line
     inline void FIXLINE(char * s) {
-        int len = (int) strlen(s)-1;
+        size_t len = strlen(s)-1;
         if(s[len] == '\n') s[len] = 0;
     }
     
@@ -239,7 +242,7 @@ namespace graphchi {
                 << "Current line: \"" << s << "\"\n";
                 assert(false);
             }
-            vid_t from = atoi(t);
+            vid_t from = atoll(t);
             t = strtok(NULL, delims);
             if (t == NULL) {
                 logstream(LOG_ERROR) << "Input file is not in right format. "
@@ -247,7 +250,7 @@ namespace graphchi {
                 << "Current line: \"" << s << "\"\n";
                 assert(false);
             }
-            vid_t to = atoi(t);
+            vid_t to = atoll(t);
             
             /* Check if has value */
             t = strtok(NULL, delims);
@@ -302,7 +305,7 @@ namespace graphchi {
         assert(inf != NULL);
         logstream(LOG_INFO) << "Reading in adjacency list format!" << std::endl;
         
-        int maxlen = 100000000;
+        size_t maxlen = 100000000;
         char * s = (char*) malloc(maxlen);
         
         size_t bytesread = 0;
@@ -323,13 +326,13 @@ namespace graphchi {
             if (s[0] == '#') continue; // Comment
             if (s[0] == '%') continue; // Comment
             char * t = strtok(s, delims);
-            vid_t from = atoi(t);
+            vid_t from = atoll(t);
             t = strtok(NULL,delims);
             if (t != NULL) {
-                vid_t num = atoi(t);
+                vid_t num = atoll(t);
                 vid_t i = 0;
                 while((t = strtok(NULL,delims)) != NULL) {
-                    vid_t to = atoi(t);
+                    vid_t to = atoll(t);
                     if (from != to) {
                         sharderobj.preprocessing_add_edge(from, to, EdgeDataType());
                     }
@@ -364,7 +367,7 @@ namespace graphchi {
         // split string and push adjacent nodes
         while (std::getline(stream, token, delim)) {
             if (token.size() != 0) {
-                vid_t v = atoi(token.c_str());
+                vid_t v = atoll(token.c_str());
                 adjacencies.push_back(v);
             }
         }
@@ -391,9 +394,9 @@ namespace graphchi {
         std::string line; // current line
 
         // handle header line
-        int n = 0;  // number of nodes
-        int m = 0;  // number of edges
-        int weighted; // indicates weight scheme: 
+        vid_t n = 0;  // number of nodes
+        vid_t m = 0;  // number of edges
+        vid_t weighted; // indicates weight scheme: 
 
         if (std::getline(graphFile, line)) {
             while (line[0] == '%') { // skip comments
@@ -471,7 +474,7 @@ namespace graphchi {
                 assert(inf != NULL);
                 logstream(LOG_INFO) << "Reading in cassovary format!" << std::endl;
                 
-                int maxlen = 100000000;
+                size_t maxlen = 100000000;
                 char * s = (char*) malloc(maxlen);
                 
                 size_t bytesread = 0;
@@ -491,17 +494,17 @@ namespace graphchi {
                     if (s[0] == '#') continue; // Comment
                     if (s[0] == '%') continue; // Comment
                     char * t = strtok(s, delims);
-                    vid_t from = atoi(t);
+                    vid_t from = atoll(t);
                     t = strtok(NULL,delims);
                     if (t != NULL) {
-                        vid_t num = atoi(t);
+                        vid_t num = atoll(t);
                         
                         // Read next line
                         linenum += num + 1;
                         for(vid_t i=0; i < num; i++) {
                             s = fgets(s, maxlen, inf);
                             FIXLINE(s);
-                            vid_t to = atoi(s);
+                            vid_t to = atoll(s);
                             if (from != to) {
                                 sharderobj.preprocessing_add_edge(from, to, EdgeDataType());
                             }
