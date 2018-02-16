@@ -403,7 +403,7 @@ namespace graphchi {
                 std::getline(graphFile, line);
             }
 
-            std::vector<uint> tokens = parseLine(line);
+            std::vector<vid_t> tokens = parseLine(line);
             n = tokens[0];
             m = tokens[1];
             if (tokens.size() == 2) {

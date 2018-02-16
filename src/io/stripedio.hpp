@@ -50,7 +50,7 @@
 #include "util/ioutil.hpp"
 #include "util/cmdopts.hpp"
 
-#define CACHED_SESSION_ID (-1)
+#define CACHED_SESSION_ID -1
 
 
 namespace graphchi {

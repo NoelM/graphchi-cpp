@@ -23,8 +23,7 @@
 
 namespace graphchi {
     
-    typedef uint32_t vid_t;
-    
+    typedef uint64_t vid_t;
     
     /** 
       * PairContainer encapsulates a pair of values of some type.
@@ -45,11 +44,11 @@ namespace graphchi {
             right = b;
         }
         
-        ET & oldval(int iter) {
+        ET & oldval(size_t iter) {
             return (iter % 2 == 0 ? left : right);
         }
         
-        void set_newval(int iter, ET x) {
+        void set_newval(size_t iter, ET x) {
             if (iter % 2 == 0) {
                 right = x;
             } else {
@@ -64,7 +63,6 @@ namespace graphchi {
         size_t edgecounter;
         shard_index(vid_t vertexid, size_t filepos, size_t edgecounter) : vertexid(vertexid), filepos(filepos), edgecounter(edgecounter) {}
     };
-    
 
 }
 

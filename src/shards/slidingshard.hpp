@@ -107,6 +107,7 @@ namespace graphchi {
                 }
             }
         }
+
         void read_async(stripedio * iomgr) {
             if (readdesc != CACHED_SESSION_ID) {
                 if (is_edata_block) {
@@ -114,9 +115,9 @@ namespace graphchi {
                 } else {
                     iomgr->managed_preada_async(readdesc, &data, end - offset, offset);
                 }
-                
             }
         }
+
         void read_now(stripedio * iomgr) {
             if (readdesc != CACHED_SESSION_ID) {
                 if (is_edata_block) {
@@ -130,16 +131,13 @@ namespace graphchi {
         void release(stripedio * iomgr) {
             if (data != NULL && readdesc != CACHED_SESSION_ID) {
                 if (is_edata_block) {
-                    
                     iomgr->managed_release(readdesc, &data);
                     iomgr->close_session(readdesc);
                 } else {
                     iomgr->managed_release(readdesc, &data);
-                    
                 }
             }
             data = NULL;
-            
         }
     };
     
@@ -174,7 +172,7 @@ namespace graphchi {
         sblock * curadjblock;
         metrics &m;
         
-        std::map<int, indexentry> sparse_index; // Sparse index that can be created in the fly
+        std::map<vid_t, indexentry> sparse_index; // Sparse index that can be created in the fly
         bool disable_writes;
         bool async_edata_loading;
         bool disable_async_writes;
@@ -232,6 +230,7 @@ namespace graphchi {
                 delete curblock;
                 curblock = NULL;
             }
+
             if (curadjblock != NULL) {
                 curadjblock->release(iomgr);
                 delete curadjblock;
@@ -249,9 +248,9 @@ namespace graphchi {
         void initdata() {
             logstream(LOG_DEBUG) << "Initialize edge data: " << filename_edata << std::endl;
             ET * initblock = (ET *) malloc(blocksize);
-            for(int i=0; i < (int) (blocksize/sizeof(ET)); i++) initblock[i] = ET();
+            for(size_t i=0; i < blocksize/sizeof(ET); i++) initblock[i] = ET();
             for(size_t off=0; off < edatafilesize; off += blocksize) {
-                std::string blockfilename = filename_shard_edata_block(filename_edata, (int) (off / blocksize), blocksize);
+                std::string blockfilename = filename_shard_edata_block(filename_edata, off / blocksize, blocksize);
                 size_t len = std::min(blocksize, edatafilesize - off);
                 int f = open(blockfilename.c_str(), O_WRONLY);
                 pwritea(f, initblock, len, 0);
@@ -267,18 +266,18 @@ namespace graphchi {
         void save_offset() {
             // Note, so that we can use the lower bound operation in map, we need
             // to insert indices in reverse order
-            sparse_index.insert(std::pair<int, indexentry>(-((int)curvid), indexentry(adjoffset, edataoffset)));
+            sparse_index.insert(std::pair<vid_t, indexentry>(curvid, indexentry(adjoffset, edataoffset)));
         }
         
         void move_close_to(vid_t v) {
             if (curvid >= v) return;
             
-            std::map<int,indexentry>::iterator lowerbd_iter = sparse_index.lower_bound(-((int)v));
-            int closest_vid = -((int)lowerbd_iter->first);
+            std::map<vid_t,indexentry>::iterator upperbd_iter = sparse_index.upper_bound(v);
+            vid_t closest_vid = upperbd_iter->first;
             assert(closest_vid>=0);
-            indexentry closest_offset = lowerbd_iter->second;
-            assert(closest_vid <= (int)v);
-            if (closest_vid > (int)curvid) {   /* Note: this will fail if we have over 2B vertices! */
+            indexentry closest_offset = upperbd_iter->second;
+            assert(closest_vid <= v);
+            if (closest_vid > curvid) {   /* Note: this will fail if we have over 2B vertices! */
                 logstream(LOG_DEBUG)
                 << "Sliding shard, start: " << range_st << " moved to: " << closest_vid << " " << closest_offset.adjoffset << ", asked for : " << v << " was in: curvid= " << curvid  << " " << adjoffset << std::endl;
                 
@@ -286,7 +285,7 @@ namespace graphchi {
                     curblock->ptr += closest_offset.edataoffset - edataoffset;
                 if (curadjblock != NULL)
                     curadjblock->ptr += closest_offset.adjoffset - adjoffset;
-                curvid = (vid_t)closest_vid;
+                curvid = closest_vid;
                 adjoffset = closest_offset.adjoffset;
                 edataoffset = closest_offset.edataoffset;
                 return;
@@ -309,10 +308,9 @@ namespace graphchi {
                     }
                 }
                 // Load next
-                std::string blockfilename = filename_shard_edata_block(filename_edata, (int) (edataoffset / blocksize), blocksize);
+                std::string blockfilename = filename_shard_edata_block(filename_edata, edataoffset / blocksize, blocksize);
                 
                 void * cachedblock = iomgr->get_block_cache().get_cached(blockfilename);
-                
                 
                 int edata_session = (cachedblock == NULL ? iomgr->open_session(blockfilename, false, true) : CACHED_SESSION_ID);
                 sblock newblock(edata_session, edata_session, true);
@@ -388,7 +386,7 @@ namespace graphchi {
         /**
          * Read out-edges for vertices.
          */
-        void read_next_vertices(int nvecs, vid_t start,  std::vector<svertex_t> & prealloc, bool record_index=false, bool disable_writes=false)  {
+        void read_next_vertices(vid_t nvecs, vid_t start,  std::vector<svertex_t> & prealloc, bool record_index=false, bool disable_writes=false)  {
             metrics_entry me = m.start_time();
             
             if (!record_index)
@@ -406,13 +404,14 @@ namespace graphchi {
             vid_t lastrec = start;
             window_start_edataoffset = edataoffset;
             
-            for(int i=((int)curvid) - ((int)start); i<nvecs; i++) {
+            assert(curvid > start);
+            for(vid_t i=curvid - start; i<nvecs; i++) {
                 if (adjoffset >= adjfilesize) break;
                 
                 // TODO: skip unscheduled vertices.
                 
-                int n;
-                if (record_index && (size_t)(curvid - lastrec) >= (size_t) std::max((int)100000, nvecs/16)) {
+                vid_t n;
+                if (record_index && (size_t)(curvid - lastrec) >= (size_t) std::max((vid_t)100000, nvecs/16)) {
                     save_offset();
                     lastrec = curvid;
                 }
@@ -431,50 +430,42 @@ namespace graphchi {
                     n = ns;
                 }
                 
-                if (i<0) {
-                    // Just skipping
-                    skip(n, sizeof(vid_t));
-                } else {
-                    svertex_t& vertex = prealloc[i];
-                    
-                    if (vertex.scheduled) {
+                svertex_t& vertex = prealloc[i];
+                
+                if (vertex.scheduled) {
+                    while(--n >= 0) {
+                        bool special_edge = false;
+                        vid_t target = (sizeof(ET) == sizeof(ETspecial) ? read_val<vid_t>() : translate_edge(read_val<vid_t>(), special_edge));
+                        ET * evalue = (special_edge ? (ET*)read_edgeptr<ETspecial>(): read_edgeptr<ET>());
                         
-                        while(--n >= 0) {
-                            bool special_edge = false;
-                            vid_t target = (sizeof(ET) == sizeof(ETspecial) ? read_val<vid_t>() : translate_edge(read_val<vid_t>(), special_edge));
-                            ET * evalue = (special_edge ? (ET*)read_edgeptr<ETspecial>(): read_edgeptr<ET>());
-                            
-                            if (!only_adjacency) {
-                                if (!curblock->active) {
-                                    if (async_edata_loading) {
-                                        curblock->read_async(iomgr);
-                                    } else {
-                                        curblock->read_now(iomgr);
-                                    }
+                        if (!only_adjacency) {
+                            if (!curblock->active) {
+                                if (async_edata_loading) {
+                                    curblock->read_async(iomgr);
+                                } else {
+                                    curblock->read_now(iomgr);
                                 }
-                                // Note: this needs to be set always because curblock might change during this loop.
-                                curblock->active = true; // This block has an scheduled vertex - need to commit
                             }
-                            vertex.add_outedge(target, evalue, special_edge);
-                            
-                            if (!((target >= range_st && target <= range_end))) {
-                                logstream(LOG_ERROR) << "Error : " << target << " not in [" << range_st << " - " << range_end << "]" << std::endl;
-                                iomgr->print_session(adjfile_session);
-                            }
-                            assert(target >= range_st && target <= range_end);
+                            // Note: this needs to be set always because curblock might change during this loop.
+                            curblock->active = true; // This block has an scheduled vertex - need to commit
                         }
+                        vertex.add_outedge(target, evalue, special_edge);
                         
-                    } else {
-                        // This vertex was not scheduled, so we can just skip its edges.
-                        skip(n, sizeof(vid_t));
+                        if (!((target >= range_st && target <= range_end))) {
+                            logstream(LOG_ERROR) << "Error : " << target << " not in [" << range_st << " - " << range_end << "]" << std::endl;
+                            iomgr->print_session(adjfile_session);
+                        }
+                        assert(target >= range_st && target <= range_end);
                     }
+                } else {
+                    // This vertex was not scheduled, so we can just skip its edges.
+                    skip(n, sizeof(vid_t));
                 }
                 curvid++;
             }
             m.stop_time(me, "read_next_vertices");
             curblock = NULL;
         }
-        
         
         /**
          * Commit modifications.
@@ -522,11 +513,11 @@ namespace graphchi {
          * Release blocks that come prior to the current offset/
          */
         void release_prior_to_offset(bool all=false, bool disable_writes=false) { // disable writes is for the dynamic case
-            for(int i=(int)activeblocks.size() - 1; i >= 0; i--) {
-                sblock &b = activeblocks[i];
+            for(auto it = activeblocks.rbegin(); it != activeblocks.rend(); it++) {
+                sblock &b = *it;
                 if (b.end <= edataoffset || all) {
                     commit(b, all, disable_writes);
-                    activeblocks.erase(activeblocks.begin() + (unsigned int)i);
+                    activeblocks.erase(it.base());
                 }
             }
         }
@@ -549,12 +540,7 @@ namespace graphchi {
             json << range_end;
             return json.str();
         }
-        
     };
-    
-    
-    
-    
 };
 
 

@@ -947,9 +947,9 @@ namespace graphchi {
         
         template <typename T>
         void edata_flush(char * buf, char * bufptr, std::string & shard_filename, size_t totbytes) {
-            int blockid = (int) ((totbytes - sizeof(T)) / base_engine::blocksize);
-            int len = (int) (bufptr - buf);
-            assert(len <= (int)base_engine::blocksize);
+            uint blockid = (uint) ((totbytes - sizeof(T)) / base_engine::blocksize);
+            size_t len = bufptr - buf;
+            assert(len <= base_engine::blocksize);
             
             std::string block_filename = filename_shard_edata_block(shard_filename, blockid, base_engine::blocksize);
             int f = open(block_filename.c_str(), O_RDWR | O_CREAT, S_IROTH | S_IWOTH | S_IWUSR | S_IRUSR);

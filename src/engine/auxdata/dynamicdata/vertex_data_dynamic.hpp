@@ -58,7 +58,7 @@ namespace graphchi {
 
     template <typename VertexDataType>
     struct vdblock_t {
-        int blockid;
+        uint blockid;
         int fd;
         uint8_t* data;
         dynamicdata_block<VertexDataType> * dblock;
@@ -138,7 +138,7 @@ namespace graphchi {
             loadedblocks.clear();
         }
         
-        void init_block(int blockid) {
+        void init_block(uint blockid) {
             std::string bfilename = blockfilename(blockid);
             if (!file_exists(bfilename)) {
                 mkdir(dirname.c_str(), 0777);
@@ -152,10 +152,8 @@ namespace graphchi {
                 close(f);
             }
         }
-    
-    
         
-        vdblock load_block(int blockid) {
+        vdblock load_block(uint blockid) {
             vdblock db(blockid);
             
             std::string blockfname = blockfilename(blockid);
@@ -219,12 +217,11 @@ namespace graphchi {
         
         
         VertexDataType * vertex_data_ptr(vid_t vertexid) {
-            int blockid = vertexid / verticesperblock;
-            int firstloaded = loadedblocks[0].blockid;
+            uint blockid = vertexid / verticesperblock;
+            uint firstloaded = loadedblocks[0].blockid;
             dynamicdata_block<VertexDataType> * dynblock = loadedblocks[blockid - firstloaded].dblock;
             return dynblock->edgevec(vertexid % verticesperblock);
         }   
-        
         
     };
 }

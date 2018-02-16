@@ -28,13 +28,7 @@
 #include <math.h>
 #include "graphchi_types.hpp"
 
-
-
-
-
 namespace graphchi {
-    
-     
     
     // Cannot be greater than 8 without changing definition of bIndexT
     //    from unsigned char to unsigned int (or unsigned short)
@@ -43,7 +37,7 @@ namespace graphchi {
     
     // a type that must hold MAX_RADIX bits
     typedef unsigned char bIndexT;
-    typedef long long int intT;
+    typedef uint64_t intT;
     
     // input in A, output in B
     template <class E, class F>

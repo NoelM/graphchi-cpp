@@ -292,6 +292,10 @@ namespace graphchi {
         
     }
       
+      inline void stop_time(metrics_entry me, std::string key, uint iternum, bool show=false) {
+        stop_time(me, key, (int)iternum, false);
+      }
+
       inline void stop_time(metrics_entry me, std::string key, int iternum, bool show=false) {
           me.timer_stop();
           mlock.lock();

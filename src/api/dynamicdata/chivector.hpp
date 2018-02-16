@@ -34,10 +34,8 @@
 #include <stdint.h>
 
 namespace graphchi {
-
     
 #define MINCAPACITY 2
-    
 
 /**
   * Pool the extension parts of chi-vectors
@@ -47,23 +45,22 @@ class extension_pool {
         
 };
     
-    
 template <typename T>
 class chivector {
 
-    uint16_t nsize;
-    uint16_t ncapacity;
+    size_t nsize;
+    size_t ncapacity;
     T * data;
     std::vector<T> * extensions;  // TODO: use a more memory efficient system?
     
 public:
     typedef T element_type_t;
-    typedef uint32_t sizeword_t;
+    typedef size_t sizeword_t;
     chivector() {
         extensions = NULL;
     }
     
-    chivector(uint16_t sz, uint16_t cap, T * dataptr) : data(dataptr) {
+    chivector(size_t sz, size_t cap, T * dataptr) : data(dataptr) {
         nsize = sz;
         ncapacity = cap;
         assert(cap >= nsize);
@@ -78,17 +75,17 @@ public:
     }
     
     void write(T * dest) {
-        int sz = (int) this->size();
-        for(int i=0; i < sz; i++) {
+        size_t sz = this->size();
+        for(size_t i=0; i < sz; i++) {
             dest[i] = get(i);  // TODO: use memcpy
         }
     }
     
-    uint16_t size() {
+    size_t size() {
         return nsize;
     }
     
-    uint16_t capacity() {
+    size_t capacity() {
         return nsize > MINCAPACITY ? nsize : MINCAPACITY;
     }
     
@@ -104,7 +101,7 @@ public:
     //idx should already exist in the array
     void set(int idx, T val){
 	if (idx >= ncapacity) {
-            (*extensions)[idx - (int)ncapacity] = val;
+            (*extensions)[idx - ncapacity] = val;
         } else {
             data[idx] = val;
         }
@@ -112,15 +109,15 @@ public:
   
     // TODO: addmany()
     
-    T get(int idx) {
+    T get(size_t idx) {
         if (idx >= ncapacity) {
-            return (* extensions)[idx - (int)ncapacity];
+            return (* extensions)[idx - ncapacity];
         } else {
             return data[idx];
         }
     }
     
-    void remove(int idx) {
+    void remove(size_t idx) {
         assert(false);
     }
     
@@ -134,7 +131,6 @@ public:
     }
     
     // TODO: iterators
-    
 };
     
 }

@@ -76,8 +76,8 @@ namespace graphchi {
         functional_vertex_unweighted_bulksync(vid_t _id, 
                                               graphchi_edge<ET> * iptr, 
                                               graphchi_edge<ET> * optr, 
-                                              int indeg, 
-                                              int outdeg) {
+                                              vid_t indeg, 
+                                              vid_t outdeg) {
             assert(false); // This should never be called.
         }
         

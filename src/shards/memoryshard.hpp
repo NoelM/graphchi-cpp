@@ -115,9 +115,9 @@ namespace graphchi {
         }
         
         ~memory_shard() {
-            int nblocks = (int) block_edatasessions.size();
+            size_t nblocks = block_edatasessions.size();
             
-            for(int i=0; i < nblocks; i++) {
+            for(size_t i=0; i < nblocks; i++) {
                 if (edgedata[i] != NULL && block_edatasessions[i] != CACHED_SESSION_ID) {
                     iomgr->managed_release(block_edatasessions[i], &edgedata[i]);
                     iomgr->close_session(block_edatasessions[i]);
@@ -154,13 +154,13 @@ namespace graphchi {
              * Out-edges are in a continuous "window", while in-edges are
              * scattered all over the shard
              */
-            int nblocks = (int) block_edatasessions.size();
+            size_t nblocks = block_edatasessions.size();
             
             if (commit_inedges) {
-                int start_stream_block = (int) (range_start_edge_ptr / blocksize);
+                size_t start_stream_block = range_start_edge_ptr / blocksize;
                 
 #pragma omp parallel for
-                for(int i=0; i < nblocks; i++) {
+                for(size_t i=0; i < nblocks; i++) {
                     /* Write asynchronously blocks that will not be needed by the sliding windows on
                      this iteration. */
                     if (i >= start_stream_block || disable_async_writes) {
@@ -192,10 +192,10 @@ namespace graphchi {
                     last = edatafilesize;
                 }
                 //char * bufp = ((char*)edgedata + range_start_edge_ptr);
-                int startblock = (int) (range_start_edge_ptr / blocksize);
-                int endblock = (int) (last / blocksize);
+                size_t startblock = range_start_edge_ptr / blocksize;
+                size_t endblock = last / blocksize;
 #pragma omp parallel for
-                for(int i=0; i < nblocks; i++) {
+                for(size_t i=0; i < nblocks; i++) {
                     if (block_edatasessions[i] != CACHED_SESSION_ID) {
                         if (false == iomgr->get_block_cache().consider_caching(
                                                                                iomgr->get_session_filename(block_edatasessions[i]), edgedata[i], blocksizes[i], true)) {
@@ -212,7 +212,7 @@ namespace graphchi {
                     edgedata[i] = NULL;
                 }
             } else {
-                for(int i=0; i < nblocks; i++) {
+                for(size_t i=0; i < nblocks; i++) {
                     if (block_edatasessions[i] != CACHED_SESSION_ID) {
                         iomgr->close_session(block_edatasessions[i]);
                     }
@@ -223,7 +223,7 @@ namespace graphchi {
             
             iomgr->managed_release(adj_session, &adjdata);
             // FIXME: this is duplicated code from destructor
-            for(int i=0; i < nblocks; i++) {
+            for(size_t i=0; i < nblocks; i++) {
                 if (edgedata[i] != NULL) {
                     if (block_edatasessions[i] != CACHED_SESSION_ID) {
                         iomgr->managed_release(block_edatasessions[i], &edgedata[i]);
@@ -257,10 +257,10 @@ namespace graphchi {
             int f = open(indexfile.c_str(), O_RDONLY);
             size_t sz = readfull(f, &idxraw);
             
-            int nidx = (int) (sz / sizeof(shard_index));
+            size_t nidx = sz / sizeof(shard_index);
             std::vector<shard_index> idx;
             idx.push_back(shard_index(0, 0, 0));  // Implicit
-            for(int i=0; i<nidx; i++) {
+            for(size_t i=0; i<nidx; i++) {
                 idx.push_back(idxraw[i]);
             }
             
@@ -271,14 +271,14 @@ namespace graphchi {
         
         void load_edata() {
             assert(blocksize % sizeof(ET) == 0);
-            int nblocks = (int) (edatafilesize / blocksize + (edatafilesize % blocksize != 0));
+            uint nblocks = (uint) (edatafilesize / blocksize + (edatafilesize % blocksize != 0));
             edgedata = (char **) calloc(nblocks, sizeof(char*));
             size_t compressedsize = 0;
-            int blockid = 0;
+            uint blockid = 0;
             
             if (!async_edata_loading) {
                 doneptr = (int *) malloc(nblocks * sizeof(int));
-                for(int i=0; i < nblocks; i++) doneptr[i] = 1;
+                for(size_t i=0; i < nblocks; i++) doneptr[i] = 1;
             }
             
             while(blockid < nblocks) {
@@ -330,34 +330,28 @@ namespace graphchi {
             
         }
         
-        
     public:
         
         // TODO: recycle ptr!
         void load() {
             is_loaded = true;
             adjfilesize = get_filesize(filename_adj);
-            
 #ifdef SUPPORT_DELETIONS
             async_edata_loading = false;  // Currently we encode the deleted status of an edge into the edge value (should be changed!),
             // so we need the edge data while loading
 #endif
-            
-            //preada(adjf, adjdata, adjfilesize, 0);
-            
             adj_session = iomgr->open_session(filename_adj, true);
             iomgr->managed_malloc(adj_session, &adjdata, adjfilesize, 0);
             
             /* Load in parallel: replaces older stream solution */
             size_t bufsize = 16 * 1024 * 1024;
-            int n = (int) (adjfilesize / bufsize + 1);
+            size_t n = adjfilesize / bufsize + 1;
             
 #pragma omp parallel for
-            for(int i=0; i < n; i++) {
+            for(size_t i=0; i < n; i++) {
                 size_t toread = std::min(adjfilesize - i * bufsize, (size_t)bufsize);
                 iomgr->preada_now(adj_session, adjdata + i * bufsize, toread, i * bufsize, true);
             }
-            
             
             /* Initialize edge data asynchonous reading */
             if (!only_adjacency) {
@@ -365,21 +359,16 @@ namespace graphchi {
                 load_edata();
             }
             
-            
             // Now start creating vertices
-            
             streaming_offset = 0;
             streaming_offset_vid = 0;
             streaming_offset_edge_ptr = 0;
             range_start_offset = adjfilesize;
             range_start_edge_ptr = edatafilesize;
             
-            
             // Get index
             index = load_index();
         }
-        
-        
         
         void load_vertices(vid_t window_st, vid_t window_en, std::vector<svertex_t> & prealloc, bool inedges=true, bool outedges=true) {
             /* Find file size */
@@ -387,7 +376,7 @@ namespace graphchi {
             
             assert(adjdata != NULL);
             
-            int nblocks = (int) (edatafilesize / blocksize + (edatafilesize % blocksize != 0));
+            size_t nblocks = edatafilesize / blocksize + (edatafilesize % blocksize != 0);
            
             bool setoffset = false;
             bool setrangeoffset = false;
@@ -398,18 +387,17 @@ namespace graphchi {
             }
 
 #pragma omp parallel for schedule(dynamic, 1)
-            for(int chunk=0; chunk < (int)index.size(); chunk++) {
+            for(size_t chunk=0; chunk < index.size(); chunk++) {
                 /* Parallelized loading of adjacency data ... */
                 uint8_t * ptr = adjdata + index[chunk].filepos;
-                uint8_t * end = adjdata + (chunk < (int) index.size() - 1 ? index[chunk + 1].filepos :  adjfilesize);
+                uint8_t * end = adjdata + (chunk < index.size() - 1 ? index[chunk + 1].filepos :  adjfilesize);
                 vid_t vid = index[chunk].vertexid;
-                vid_t viden = (chunk < (int) index.size() - 1 ? index[chunk + 1].vertexid :  0xffffffffu);
+                vid_t viden = (chunk < index.size() - 1 ? index[chunk + 1].vertexid :  0xffffffffu);
                 size_t edgeptr = index[chunk].edgecounter * sizeof(ET);
-                size_t edgeptr_end =  (chunk < (int) index.size() - 1 ? index[chunk + 1].edgecounter * sizeof(ET) : edatafilesize);
+                size_t edgeptr_end =  (chunk < index.size() - 1 ? index[chunk + 1].edgecounter * sizeof(ET) : edatafilesize);
 
                 bool contains_range_end = vid < range_end && viden > range_end;
                 bool contains_range_st = vid <= range_st && viden > range_st;
-                
                 
                 // Optimization:
                 if (!inedges && (vid > window_en || viden < window_st)) {
@@ -418,13 +406,12 @@ namespace graphchi {
                 
                 if (!async_edata_loading && !only_adjacency) {
                     /* Wait until blocks loaded (non-asynchronous version) */
-                    for(int blid=(int)edgeptr/blocksize; blid<=(int)(edgeptr_end /blocksize); blid++) {
+                    for(size_t blid = edgeptr/blocksize; blid <= edgeptr_end /blocksize; blid++) {
                         if (blid < nblocks) {
                             while(doneptr[blid] != 0) { usleep(10); }
                         }
                     }
                 }
-                
                 
                 while(ptr < end) {
                    if (contains_range_end) {
@@ -446,7 +433,7 @@ namespace graphchi {
                     }
                     
                     uint8_t ns = *ptr;
-                    int n;
+                    uint32_t n;
                     
                     ptr += sizeof(uint8_t);
                     
@@ -473,7 +460,7 @@ namespace graphchi {
                     }
                     bool any_edges = false;
                     while(--n>=0) {
-                        int blockid = (int) (edgeptr / blocksize);
+                        uint blockid = (uint) (edgeptr / blocksize);
                        
                         vid_t target = *((vid_t*) ptr);
                         ptr += sizeof(vid_t);
@@ -490,9 +477,9 @@ namespace graphchi {
                                     if (dstvertex.scheduled) {
                                         any_edges = true;
                                         //  assert(only_adjacency ||  edgeptr < edatafilesize);
-                                        char * eptr = (only_adjacency ? NULL  : &(edgedata[blockid][edgeptr % blocksize]));
+                                        char * eptr = (only_adjacency ? NULL : &(edgedata[blockid][edgeptr % blocksize]));
                                         
-                                        dstvertex.add_inedge(vid,  (only_adjacency ? NULL : (ET*) eptr), false);
+                                        dstvertex.add_inedge(vid, (only_adjacency ? NULL : (ET*) eptr), false);
                                         dstvertex.parallel_safe = dstvertex.parallel_safe && (vertex == NULL); // Avoid if
                                     }
                                 }
@@ -506,7 +493,6 @@ namespace graphchi {
                             }
                         }
                         edgeptr += sizeof(ET);
-                        
                     }
                     
                     if (any_edges && vertex != NULL) {
@@ -521,16 +507,14 @@ namespace graphchi {
         size_t offset_for_stream_cont() {
             return streaming_offset;
         }
+
         vid_t offset_vid_for_stream_cont() {
             return streaming_offset_vid;
         }
+
         size_t edata_ptr_for_stream_cont() {
             return streaming_offset_edge_ptr;
         }
-        
-        
-        
-        
     };
 };
 

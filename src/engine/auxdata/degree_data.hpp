@@ -43,13 +43,12 @@ namespace graphchi {
     
     
     struct degree {
-        int indegree;
-        int outdegree;
+        vid_t indegree;
+        vid_t outdegree;
     };
     
     
     class degree_data {
-    
     
     protected:
         /* Current range of vertices in memory */
@@ -149,7 +148,7 @@ namespace graphchi {
             }
         }  
         
-        virtual void set_degree(vid_t vertexid, int indegree, int outdegree) {
+        virtual void set_degree(vid_t vertexid, vid_t indegree, vid_t outdegree) {
             modified = true;
             if (!use_mmap) {
                 assert(vertexid >= vertex_st && vertexid <= vertex_en);

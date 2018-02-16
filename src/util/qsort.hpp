@@ -28,15 +28,14 @@
 #include <vector>
 
 template <class E, class BinPred>
-void insertionSort(E* A, int n, BinPred f) {
-    for (int i=0; i < n; i++) {
+void insertionSort(E* A, uint64_t n, BinPred f) {
+    for (uint64_t i=0; i < n; i++) {
         E v = A[i];
         E* B = A + i;
         while (--B >= A && f(v,*B)) *(B+1) = *B;
         *(B+1) = v;
     }
 }
-
 
 #define ISORT 25
 
@@ -48,7 +47,7 @@ E median(E a, E b, E c, BinPred f) {
 
  // Partly copied from PBBS
 template <class E, class BinPred>
-void quickSort(E* A, int n, BinPred f) {
+void quickSort(E* A, uint64_t n, BinPred f) {
     if (n < ISORT) insertionSort(A, n, f);
     else {
         E p = A[rand() % n]; // Random pivot
@@ -67,11 +66,11 @@ void quickSort(E* A, int n, BinPred f) {
             if (f(*M,p)) std::swap(*M,*(L++));
             M++;
         }
-        quickSort(A, (int) (L-A), f);
-        quickSort(M, (int) (A+n-M), f); // Exclude all elts that equal pivot
+        assert(L > A);
+        quickSort(A, (L-A), f);
+        assert(A+n > M);
+        quickSort(M, (A+n-M), f); // Exclude all elts that equal pivot
     }
 } 
 
-
 #endif  
-

@@ -33,13 +33,13 @@
 
 namespace graphchi {
     
-    int get_block_uncompressed_size(std::string blockfilename, int defaultsize);
-    int get_block_uncompressed_size(std::string blockfilename, int defaultsize) {
+    int get_block_uncompressed_size(std::string blockfilename, size_t defaultsize);
+    int get_block_uncompressed_size(std::string blockfilename, size_t defaultsize) {
         std::string szfilename = blockfilename + ".bsize";
         FILE * f = fopen(szfilename.c_str(), "r");
         if (f != NULL) {
             int sz;
-            fread(&sz, 1, sizeof(int), f);
+            fread(&sz, 1, sizeof(size_t), f);
             fclose(f);
             return sz;
         } else {
@@ -47,11 +47,11 @@ namespace graphchi {
         }
     }
     
-    void write_block_uncompressed_size(std::string blockfilename, int size);
-    void write_block_uncompressed_size(std::string blockfilename, int size) {
+    void write_block_uncompressed_size(std::string blockfilename, size_t size);
+    void write_block_uncompressed_size(std::string blockfilename, size_t size) {
         std::string szfilename = blockfilename + ".bsize";
         FILE * f = fopen(szfilename.c_str(), "w");
-        fwrite(&size, 1, sizeof(int), f);
+        fwrite(&size, 1, sizeof(size_t), f);
         fclose(f);
         
         if (size > 20000000) {
@@ -65,28 +65,29 @@ namespace graphchi {
         int err = remove(szfilename.c_str());
         if (err != 0) {
             // File did not exist - ok
-            
         }
     }
     
-    
     template <typename ET>
     struct dynamicdata_block {
-        int nitems;
+        size_t nitems;
         uint8_t * data;
         ET * chivecs;
         
         dynamicdata_block() : data(NULL), chivecs(NULL) {}
         
-        dynamicdata_block(int nitems, uint8_t * data, int datasize) : nitems(nitems){
+        /**
+         * Strange function ! Modified `chivector` to support `size_t`. Here, the same is modified.
+         */
+        dynamicdata_block(int nitems, uint8_t * data, size_t datasize) : nitems(nitems){
             chivecs = new ET[nitems];
             uint8_t * ptr = data;
-            for(int i=0; i < nitems; i++) {
+            for(size_t i=0; i < nitems; i++) {
                 assert(ptr - data <= datasize);
                 typename ET::sizeword_t * sz = ((typename ET::sizeword_t *) ptr);
                 ptr += sizeof(typename ET::sizeword_t);
-                chivecs[i] = ET(((uint16_t *)sz)[0], ((uint16_t *)sz)[1], (typename ET::element_type_t *) ptr);
-                ptr += (int) ((uint16_t *)sz)[1] * sizeof(typename ET::element_type_t);
+                chivecs[i] = ET(((size_t *)sz)[0], ((size_t *)sz)[1], (typename ET::element_type_t *) ptr);
+                ptr += ((size_t *)sz)[1] * sizeof(typename ET::element_type_t);
             }
         }
         
@@ -95,11 +96,11 @@ namespace graphchi {
             assert(chivecs != NULL);
             return &chivecs[i];
         }
-        
-        void write(uint8_t ** outdata, int & size) {
+       
+        void write(uint8_t ** outdata, size_t & size) {
             // First compute size
             size = 0;
-            for(int i=0; i < nitems; i++) {
+            for(size_t i=0; i < nitems; i++) {
                 size += chivecs[i].capacity() * sizeof(typename ET::element_type_t) + sizeof(typename ET::sizeword_t);
             }
             
@@ -107,11 +108,11 @@ namespace graphchi {
             uint8_t * ptr = *outdata;
             for(int i=0; i < nitems; i++) {
                 ET & vec = chivecs[i];
-                ((uint16_t *) ptr)[0] = vec.size();
-                ((uint16_t *) ptr)[1] = vec.capacity();
+                ((size_t *) ptr)[0] = vec.size();
+                ((size_t *) ptr)[1] = vec.capacity();
 
                 ptr += sizeof(typename ET::sizeword_t);
-                vec.write((typename ET::element_type_t *)  ptr);
+                vec.write((typename ET::element_type_t *) ptr);
                 ptr += vec.capacity() * sizeof(typename ET::element_type_t);
             }
         }
@@ -121,11 +122,7 @@ namespace graphchi {
                 delete [] chivecs;
             }
         }
-        
     };
-
-    
 };
-
 
 #endif

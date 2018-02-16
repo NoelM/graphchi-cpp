@@ -177,7 +177,7 @@ namespace graphchi {
         }
         
         internal_graphchi_vertex(vid_t _id, graphchi_edge<EdgeDataType> * iptr, graphchi_edge<EdgeDataType> * optr, 
-                                 int indeg, int outdeg) : vertexid(_id), inedges_ptr(iptr), outedges_ptr(optr) {
+                                 vid_t indeg, vid_t outdeg) : vertexid(_id), inedges_ptr(iptr), outedges_ptr(optr) {
             inc = 0;
             outc = 0;
             scheduled = false;
@@ -245,7 +245,7 @@ namespace graphchi {
         graphchi_vertex() : internal_graphchi_vertex<VertexDataType, EdgeDataType>() { }
         
         graphchi_vertex(vid_t _id, graphchi_edge<EdgeDataType> * iptr, graphchi_edge<EdgeDataType> * optr, 
-                        int indeg, int outdeg) : 
+                        vid_t indeg, vid_t outdeg) : 
             internal_graphchi_vertex<VertexDataType, EdgeDataType>(_id, iptr, optr, indeg, outdeg) {}
         
         virtual ~graphchi_vertex() {}

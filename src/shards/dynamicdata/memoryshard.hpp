@@ -218,8 +218,7 @@ namespace graphchi {
             int nblocks = (int) (edatafilesize / blocksize + (edatafilesize % blocksize != 0));
             edgedata = (char **) calloc(nblocks, sizeof(char*));
             size_t compressedsize = 0;
-            int blockid = 0;
-           
+            uint blockid = 0;
             
             while(true) {
                 std::string block_filename = filename_shard_edata_block(filename_edata, blockid, blocksize);
@@ -253,7 +252,7 @@ namespace graphchi {
         }
         
         /* Initialize a dynamic block if required */
-        void check_block_initialized(int blockid) {
+        void check_block_initialized(uint blockid) {
             if (dynamicblocks[blockid] == NULL) {
                 std::string block_filename = filename_shard_edata_block(filename_edata, blockid, blocksize);
                 size_t fsize = get_block_uncompressed_size(block_filename, std::min(edatafilesize - blocksize * blockid, blocksize)); //std::min(edatafilesize - blocksize * blockid, blocksize);
@@ -364,7 +363,7 @@ namespace graphchi {
                 }
                 bool any_edges = false;
                 while(--n>=0) {
-                    int blockid = (int) (edgeptr / blocksize);
+                    uint blockid = (uint) (edgeptr / blocksize);
                                         
                     vid_t target = *((vid_t*) ptr);
                     ptr += sizeof(vid_t);

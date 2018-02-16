@@ -35,8 +35,8 @@ namespace graphchi {
     
     struct vertex_info {
         vid_t vertexid;
-        int indegree;
-        int outdegree;
+        vid_t indegree;
+        vid_t outdegree;
     };
     
     /* Special sparse locking */
@@ -46,6 +46,5 @@ namespace graphchi {
     }
 
 };
-
 
 #endif
